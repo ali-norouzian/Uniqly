@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO.Hashing;
+using Microsoft.VisualBasic.FileIO;
 
 namespace Uniqly.Ui.Cli;
 internal static class Handler
@@ -11,7 +12,9 @@ internal static class Handler
     {
         var sw = Stopwatch.StartNew();
 
-        var fileAddresses = Directory.GetFiles(_args[1], "*", SearchOption.AllDirectories);
+        var searchAddress = _args[1];
+
+        var fileAddresses = Directory.GetFiles(searchAddress, "*", System.IO.SearchOption.AllDirectories);
         var fileAddressesLength = fileAddresses.Length;
 
         Console.WriteLine($"{fileAddressesLength} files found.");
@@ -24,12 +27,11 @@ internal static class Handler
         List<string> fileAdresses;
         var dups = new Dictionary<ulong, List<string>>();
         var index = 0;
+        int bytesRead;
         foreach (var fileAddress in fileAddresses)
         {
             using (var stream = File.OpenRead(fileAddress))
             {
-                int bytesRead;
-
                 while ((bytesRead = stream.Read(buffer)) > 0)
                 {
                     xxHash64.Append(buffer);//.AsSpan(0, bytesRead)
@@ -55,5 +57,68 @@ internal static class Handler
         }
 
         Console.WriteLine(sw.Elapsed);
+
+        // Write results in file
+        FileInfo fileInfo;
+        var resultFileAddress = $"{searchAddress}{Path.DirectorySeparatorChar}.UniqlySearchResult";
+        using (var writer = new StreamWriter(resultFileAddress))
+        {
+            foreach (var (_, values) in dups.Where(e => 1 < e.Value.Count))
+            {
+                foreach (var value in values)
+                {
+                    fileInfo = new FileInfo(value);
+
+                    writer.WriteLine($"stay/remove {value} | (Size: {FormatSize(fileInfo.Length)})");
+                }
+
+                writer.WriteLine();
+            }
+        }
+
+        Console.WriteLine(resultFileAddress);
+
+        // Open the file with the default editor
+        var process = Process.Start(new ProcessStartInfo(resultFileAddress) { UseShellExecute = true });
+        process.WaitForExit();
+
+        // Read results and take action
+        long deletedSize = 0;
+        using (var reader = new StreamReader(resultFileAddress))
+        {
+            var commands = new string[2];
+            string line;
+            while ((line = reader.ReadLine()) != null)
+            {
+                commands = line.Split(" ", 2);
+                if (string.Equals(commands.First(), nameof(Enum.Remove), StringComparison.OrdinalIgnoreCase))
+                {
+                    commands = commands.Last().Split(" | ");
+                    fileInfo = new FileInfo(commands.First());
+                    deletedSize += fileInfo.Length;
+
+                    FileSystem.DeleteFile(commands.First(), UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+                }
+            }
+        }
+
+        Console.WriteLine($"Selected files moved to recycle bin. (Size: {FormatSize(deletedSize)})");
     }
+
+    // Helper method to format size in a human-readable way
+    static string FormatSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        int order = 0;
+        double size = bytes;
+
+        while (size >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            size /= 1024;
+        }
+
+        return $"{size:0.##} {sizes[order]}";
+    }
+
 }

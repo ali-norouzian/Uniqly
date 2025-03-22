@@ -10,4 +10,5 @@ switch (args[0])
 
 }
 
-Console.ReadKey();
+
+await Task.Delay(1000000000);
