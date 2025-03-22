@@ -1,6 +1,6 @@
 using Uniqly.Ui.Cli;
 
-args = [Const.FindDuplicates, "D:\\WithDups"];// E:\\Phone
+args = [Const.FindDuplicates, "E:\\Phone"];// E:\\Phone
 
 switch (args[0])
 {
@@ -9,6 +9,5 @@ switch (args[0])
         break;
 
 }
-
 
 await Task.Delay(1000000000);
