@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "Uniqly.Ui.Cli": {
+      "commandName": "Project",
+      //"commandLineArgs": "--find-duplicates \"D:\\WithDups\"",
+      "commandLineArgs": "--apply-changes \"D:\\WithDups\" --keep-newest"
+    }
+  }
+}

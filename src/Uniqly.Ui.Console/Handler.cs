@@ -6,8 +6,9 @@ namespace Uniqly.Ui.Cli;
 internal static class Handler
 {
     //private static readonly string[] _args = [Command.FindDuplicates, "D:\\WithDups"];// E:\\Phone
-    private static readonly string[] _args = [Command.ApplyChanges, "D:\\WithDups", Command.KeepNewest];// E:\\Phone
-                                                                                                        //Environment.GetCommandLineArgs();
+    //private static readonly string[] _args = [Command.ApplyChanges, "D:\\WithDups", Command.KeepNewest];// E:\\Phone
+    private static readonly string[] _args = [.. Environment.GetCommandLineArgs().Skip(1)];
+    private const string Spaces = "                         ";
     internal static void FindDuplicates()
     {
         FindDuplicates(
@@ -30,9 +31,9 @@ internal static class Handler
             ref fileInfo);
     }
 
-    internal static void KeepNewestAndDeleteOthers()
+    internal static void KeepNewestAndDeleteOthers(int indexOfSearchAddressArg)
     {
-        var searchAddress = _args[1];
+        var searchAddress = _args[indexOfSearchAddressArg];
         var resultFileAddress = $"{searchAddress}{Path.DirectorySeparatorChar}.UniqlySearchResult";
         FileInfo fileInfo = null;
         long deletedSize = 0;
@@ -46,23 +47,38 @@ internal static class Handler
             while ((line = reader.ReadLine()) != null)
             {
                 if (string.IsNullOrWhiteSpace(line) &&
-                    dupInfos.Any())
+                    dupInfos.Count != 0)
                 {
                     // Remove newest from list
                     dupInfos.Remove(
                         dupInfos.OrderByDescending(e => e.Value).First().Key);
 
+                    Console.ForegroundColor = ConsoleColor.DarkRed;
                     foreach (var (filePath, _) in dupInfos)
                     {
-                        FileSystem.DeleteFile(
-                            filePath,
-                            UIOption.OnlyErrorDialogs,
-                            RecycleOption.SendToRecycleBin);
+                        try
+                        {
+                            FileSystem.DeleteFile(
+                                filePath,
+                                UIOption.OnlyErrorDialogs,
+                                RecycleOption.SendToRecycleBin);
+                        }
+                        catch (FileNotFoundException)
+                        {
+                            Console.WriteLine($"File in path '{filePath}' not found.");
+                        }
                     }
+                    Console.ResetColor();
 
                     // fileInfo filled with our duplicate file info
                     // And it's not null here
-                    deletedSize += fileInfo.Length * dupInfos.Count;
+                    try
+                    {
+                        deletedSize += fileInfo.Length * dupInfos.Count;
+                    }
+                    catch (FileNotFoundException)
+                    {
+                    }
 
                     // Reset for new duplicate file
                     dupInfos.Clear();
@@ -79,7 +95,9 @@ internal static class Handler
             }
         }
 
+        Console.ForegroundColor = ConsoleColor.DarkRed;
         Console.WriteLine($"Selected files moved to recycle bin. (Size: {FormatSize(deletedSize)})");
+        Console.ResetColor();
     }
 
     static void FindDuplicates(
@@ -93,6 +111,7 @@ internal static class Handler
         var fileAddresses = Directory.GetFiles(searchAddress, "*", System.IO.SearchOption.AllDirectories);
         var fileAddressesLength = fileAddresses.Length;
 
+        Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine($"{fileAddressesLength} files found.");
 
         // 1MB buffer
@@ -128,12 +147,16 @@ internal static class Handler
             }
 
             index++;
-            Console.Clear();
-            Console.WriteLine(fileAddress);
-            Console.WriteLine($"{index} of {fileAddressesLength}.");
+            //Console.Clear();
+            //Thread.Sleep(1000);
+            Console.Write($"\r[{sw.Elapsed}] {index} of {fileAddressesLength}: {fileAddress}{Spaces}");
         }
 
-        Console.WriteLine(sw.Elapsed);
+        //Console.Clear();
+        Console.Write($"\r{index} file checked.{Spaces}{Spaces}{Spaces}{Spaces}{Spaces}{Spaces}");
+        Console.ResetColor();
+        Console.WriteLine();
+        Console.WriteLine($"Time taken: {sw.Elapsed}");
 
     }
 
@@ -143,33 +166,46 @@ internal static class Handler
         ref FileInfo fileInfo,
         out string resultFileAddress)
     {
+        dups = dups.Where(e => 1 < e.Value.Count).ToDictionary();
+        if (dups.Count == 0)
+        {
+            Console.WriteLine();
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"No duplicate file found on '{searchAddress}' and sub paths.");
+            Console.ResetColor();
+            Environment.Exit(0);
+        }
+
         // Write results in file
         resultFileAddress = $"{searchAddress}{Path.DirectorySeparatorChar}.UniqlySearchResult";
+        string section1 = "stay/remove", section2;
         using (var writer = new StreamWriter(resultFileAddress))
         {
-            foreach (var (_, values) in dups.Where(e => 1 < e.Value.Count))
+            foreach (var (_, values) in dups)
             {
                 foreach (var value in values)
                 {
                     fileInfo = new FileInfo(value);
-                    var a = $"stay/remove";
-                    var b = $"| (Size: {FormatSize(fileInfo.Length)}) | (CreationTime: {fileInfo.CreationTime}, LastWriteTime: {fileInfo.LastWriteTime})";
-                    var c = $"";
-                    writer.WriteLine($"{a,-10} {value,-100} {b,-100}");
+
+                    section2 = $"| (Size: {FormatSize(fileInfo.Length)}) | (CreationTime: {fileInfo.CreationTime}, LastWriteTime: {fileInfo.LastWriteTime})";
+
+                    writer.WriteLine($"{section1,-10} {value,-100} {section2,-100}");
                 }
 
                 writer.WriteLine();
             }
         }
 
-        Console.WriteLine(resultFileAddress);
+        Console.WriteLine();
+        Console.WriteLine($"For appling changes look at: {resultFileAddress}");
     }
 
     static void OpenResultFileWithDefaultEditorAndWaitUntilClose(
         ref string resultFileAddress)
     {
         // Open the file with the default editor
-        var process = Process.Start(new ProcessStartInfo(resultFileAddress) { UseShellExecute = true });
+        using var process = Process.Start(
+            new ProcessStartInfo(resultFileAddress) { UseShellExecute = true });
         process.WaitForExit();
 
     }
@@ -199,7 +235,10 @@ internal static class Handler
             }
         }
 
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.DarkRed;
         Console.WriteLine($"Selected files moved to recycle bin. (Size: {FormatSize(deletedSize)})");
+        Console.ResetColor();
     }
 
     // Helper method to format size in a human-readable way
