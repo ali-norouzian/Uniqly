@@ -1,5 +1,5 @@
 namespace Uniqly.Ui.Cli;
-internal enum Enum
+internal enum Action
 {
     Stay,
     Remove

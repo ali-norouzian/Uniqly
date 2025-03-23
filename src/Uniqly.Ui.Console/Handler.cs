@@ -5,8 +5,9 @@ using Microsoft.VisualBasic.FileIO;
 namespace Uniqly.Ui.Cli;
 internal static class Handler
 {
-    private static readonly string[] _args = [Const.FindDuplicates, "E:\\Phone"];// E:\\Phone
-                                                                                 //Environment.GetCommandLineArgs();
+    //private static readonly string[] _args = [Command.FindDuplicates, "D:\\WithDups"];// E:\\Phone
+    private static readonly string[] _args = [Command.ApplyChanges, "D:\\WithDups", Command.KeepNewest];// E:\\Phone
+                                                                                                        //Environment.GetCommandLineArgs();
     internal static void FindDuplicates()
     {
         FindDuplicates(
@@ -16,10 +17,10 @@ internal static class Handler
         FileInfo fileInfo = null;
 
         WriteResultsInFile(
-            ref searchAddress,
-            ref dups,
-            ref fileInfo,
-            out var resultFileAddress);
+        ref searchAddress,
+        ref dups,
+        ref fileInfo,
+        out var resultFileAddress);
 
         OpenResultFileWithDefaultEditorAndWaitUntilClose(
             ref resultFileAddress);
@@ -27,6 +28,58 @@ internal static class Handler
         ReadResultFileAndTakeAction(
             ref resultFileAddress,
             ref fileInfo);
+    }
+
+    internal static void KeepNewestAndDeleteOthers()
+    {
+        var searchAddress = _args[1];
+        var resultFileAddress = $"{searchAddress}{Path.DirectorySeparatorChar}.UniqlySearchResult";
+        FileInfo fileInfo = null;
+        long deletedSize = 0;
+        // It's only keep a same file paths in a time
+        // FilePath, fileInfo.LastWriteTimeUtc
+        var dupInfos = new Dictionary<string, DateTime>();
+        using (var reader = new StreamReader(resultFileAddress))
+        {
+            var commands = new string[2];
+            string line;
+            while ((line = reader.ReadLine()) != null)
+            {
+                if (string.IsNullOrWhiteSpace(line) &&
+                    dupInfos.Any())
+                {
+                    // Remove newest from list
+                    dupInfos.Remove(
+                        dupInfos.OrderByDescending(e => e.Value).First().Key);
+
+                    foreach (var (filePath, _) in dupInfos)
+                    {
+                        FileSystem.DeleteFile(
+                            filePath,
+                            UIOption.OnlyErrorDialogs,
+                            RecycleOption.SendToRecycleBin);
+                    }
+
+                    // fileInfo filled with our duplicate file info
+                    // And it's not null here
+                    deletedSize += fileInfo.Length * dupInfos.Count;
+
+                    // Reset for new duplicate file
+                    dupInfos.Clear();
+
+                    continue;
+                }
+
+                commands = line.Split(" ", 2);
+                commands = commands.Last().Split(" | ");
+
+                // commands.First() is file path here
+                fileInfo = new FileInfo(commands.First());
+                dupInfos.Add(commands.First().Trim(), fileInfo.CreationTime);
+            }
+        }
+
+        Console.WriteLine($"Selected files moved to recycle bin. (Size: {FormatSize(deletedSize)})");
     }
 
     static void FindDuplicates(
@@ -99,8 +152,10 @@ internal static class Handler
                 foreach (var value in values)
                 {
                     fileInfo = new FileInfo(value);
-
-                    writer.WriteLine($"stay/remove {value} | (Size: {FormatSize(fileInfo.Length)})");
+                    var a = $"stay/remove";
+                    var b = $"| (Size: {FormatSize(fileInfo.Length)}) | (CreationTime: {fileInfo.CreationTime}, LastWriteTime: {fileInfo.LastWriteTime})";
+                    var c = $"";
+                    writer.WriteLine($"{a,-10} {value,-100} {b,-100}");
                 }
 
                 writer.WriteLine();
@@ -132,7 +187,8 @@ internal static class Handler
             while ((line = reader.ReadLine()) != null)
             {
                 commands = line.Split(" ", 2);
-                if (string.Equals(commands.First(), nameof(Enum.Remove), StringComparison.OrdinalIgnoreCase))
+                // Take action
+                if (string.Equals(commands.First(), nameof(Action.Remove), StringComparison.OrdinalIgnoreCase))
                 {
                     commands = commands.Last().Split(" | ");
                     fileInfo = new FileInfo(commands.First());

@@ -1,12 +1,24 @@
 using Uniqly.Ui.Cli;
 
-args = [Const.FindDuplicates, "E:\\Phone"];// E:\\Phone
+//args = [Command.FindDuplicates, "D:\\WithDups"];// E:\\Phone
+args = [Command.ApplyChanges, "D:\\WithDups", Command.KeepNewest];// E:\\Phone
 
-switch (args[0])
+for (var i = 0; i < args.Length; i++)
 {
-    case Const.FindDuplicates:
-        Handler.FindDuplicates();
-        break;
+    switch (args[i])
+    {
+        case Command.FindDuplicates:
+            Handler.FindDuplicates();
+            break;
+        case Command.ApplyChanges:
+            switch (args[i + 2])
+            {
+                case Command.KeepNewest:
+                    Handler.KeepNewestAndDeleteOthers();
+                    break;
+            }
+            break;
+    }
 
 }
 
