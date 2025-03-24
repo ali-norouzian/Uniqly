@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO.Hashing;
+using System.Reflection;
 using Microsoft.VisualBasic.FileIO;
 
 namespace Uniqly.Ui.Cli;
@@ -7,21 +8,23 @@ internal static class Handler
 {
     //private static readonly string[] _args = [Command.FindDuplicates, "D:\\WithDups"];// E:\\Phone
     //private static readonly string[] _args = [Command.ApplyChanges, "D:\\WithDups", Command.KeepNewest];// E:\\Phone
-    private static readonly string[] _args = [.. Environment.GetCommandLineArgs().Skip(1)];
+    private static readonly string[] _args = Environment.GetCommandLineArgs();
     private const string Spaces = "                         ";
-    internal static void FindDuplicates()
+
+    internal static void FindDuplicates(int indexOfSearchAddressArg)
     {
         FindDuplicates(
+            indexOfSearchAddressArg,
             out var searchAddress,
             out var dups);
 
         FileInfo fileInfo = null;
 
         WriteResultsInFile(
-        ref searchAddress,
-        ref dups,
-        ref fileInfo,
-        out var resultFileAddress);
+            ref searchAddress,
+            ref dups,
+            ref fileInfo,
+            out var resultFileAddress);
 
         OpenResultFileWithDefaultEditorAndWaitUntilClose(
             ref resultFileAddress);
@@ -29,6 +32,17 @@ internal static class Handler
         ReadResultFileAndTakeAction(
             ref resultFileAddress,
             ref fileInfo);
+    }
+
+    internal static void DoTheDefaultApplyBehavior(int indexOfSearchAddressArg)
+    {
+        var resultFileAddress = GetResultFileAddress(indexOfSearchAddressArg);
+
+        FileInfo fileInfo = null;
+
+        ReadResultFileAndTakeAction(
+                    ref resultFileAddress,
+                    ref fileInfo);
     }
 
     internal static void KeepNewestAndDeleteOthers(int indexOfSearchAddressArg)
@@ -100,13 +114,66 @@ internal static class Handler
         Console.ResetColor();
     }
 
+    internal static void Version()
+    {
+        var version = Assembly.GetExecutingAssembly().GetName().Version;
+
+        Console.WriteLine($"v{version.Major}.{version.Minor}.{version.Build}");
+    }
+
+    internal static void Help()
+    {
+        var helpText = $@"usage: uniqly [command] [arg] [flags]";
+
+        Console.WriteLine(helpText);
+        Console.WriteLine();
+
+        Console.WriteLine($"{"Command",-10} {"Arg",-15} {"Flags(Optional)",-25} {"Description",-10}");
+        Console.WriteLine(new string('-', 110));
+
+        helpText = @$"{"",-10} {"",-15} {$"[{Command.H} | {Command.Help}]",-25} {"Helping document",-10}";
+        Console.WriteLine(helpText);
+
+        helpText = @$"{"",-10} {"",-15} {$"[{Command.V} | {Command.Version}]",-25} {"Show version of uniqly",-10}";
+        Console.WriteLine(helpText);
+
+        helpText = @$"{Command.Search,-10} {"<file-path>",-15} {"",-25} {"Search in path and it's sub paths for duplicate files",-10}";
+        Console.WriteLine(helpText);
+
+        helpText = @$"{Command.Apply,-10} {"<file-path>",-15} {$"[{Command.KN} | {Command.KeepNewest}]",-25} {"Apply changes that you selected on result file",-10}";
+        Console.WriteLine(helpText);
+    }
+
+    static string GetSearchAddress(int indexOfSearchAddressArg)
+    {
+        var searchAddress = _args[indexOfSearchAddressArg];
+
+        return searchAddress;
+    }
+
+    static string GetResultFileAddress(string searchAddress)
+    {
+        var resultFileAddress = $"{searchAddress}{Path.DirectorySeparatorChar}.UniqlySearchResult";
+
+        return resultFileAddress;
+    }
+
+    static string GetResultFileAddress(int indexOfSearchAddressArg)
+    {
+        var searchAddress = GetSearchAddress(indexOfSearchAddressArg);
+        var resultFileAddress = $"{searchAddress}{Path.DirectorySeparatorChar}.UniqlySearchResult";
+
+        return resultFileAddress;
+    }
+
     static void FindDuplicates(
+        int indexOfSearchAddressArg,
         out string searchAddress,
         out Dictionary<ulong, List<string>> dups)
     {
         var sw = Stopwatch.StartNew();
 
-        searchAddress = _args[1];
+        searchAddress = _args[indexOfSearchAddressArg];
 
         var fileAddresses = Directory.GetFiles(searchAddress, "*", System.IO.SearchOption.AllDirectories);
         var fileAddressesLength = fileAddresses.Length;
@@ -228,7 +295,18 @@ internal static class Handler
                 {
                     commands = commands.Last().Split(" | ");
                     fileInfo = new FileInfo(commands.First());
-                    deletedSize += fileInfo.Length;
+                    try
+                    {
+                        deletedSize += fileInfo.Length;
+                    }
+                    catch (FileNotFoundException)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkRed;
+                        Console.WriteLine($"File in path '{commands.First().Trim()}' not found.");
+                        Console.ResetColor();
+
+                        continue;
+                    }
 
                     FileSystem.DeleteFile(commands.First(), UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
                 }

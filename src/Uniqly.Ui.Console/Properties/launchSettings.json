@@ -2,8 +2,17 @@
   "profiles": {
     "Uniqly.Ui.Cli": {
       "commandName": "Project",
-      //"commandLineArgs": "--find-duplicates \"D:\\WithDups\"",
-      "commandLineArgs": "--apply-changes \"D:\\WithDups\" --keep-newest"
+      //"commandLineArgs": "search \"D:\\WithDups\"",
+
+      //"commandLineArgs": "apply \"D:\\WithDups\"",
+      //"commandLineArgs": "apply \"D:\\WithDups\" --keep-newest",
+
+      //"commandLineArgs": "--version",
+      //"commandLineArgs": "-v"
+
+      //"commandLineArgs": "--help",
+      //"commandLineArgs": "-h"
+
     }
   }
 }
