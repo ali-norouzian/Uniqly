@@ -6,6 +6,8 @@ internal static class Command
     internal const string Apply = "apply";
     internal const string KeepNewest = "--keep-newest";
     internal const string KN = "-kn";
+    internal const string OnlyShowInfo = "--only-show-info";
+    internal const string OSI = "-osi";
 
     internal const string Version = "--version";
     internal const string V = "-v";

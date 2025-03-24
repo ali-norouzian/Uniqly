@@ -45,8 +45,17 @@ internal static class Handler
                     ref fileInfo);
     }
 
-    internal static void KeepNewestAndDeleteOthers(int indexOfSearchAddressArg)
+    internal static void KeepNewestAndDeleteOthers(
+        int indexOfSearchAddressArg)
     {
+        var sw = Stopwatch.StartNew();
+
+        var hasDeletePermission = HasOnlyShowInfoFlagForApply();
+        if (!hasDeletePermission)
+        {
+            Console.WriteLine("No file will be deleted.");
+        }
+
         var searchAddress = _args[indexOfSearchAddressArg];
         var resultFileAddress = $"{searchAddress}{Path.DirectorySeparatorChar}.UniqlySearchResult";
         FileInfo fileInfo = null;
@@ -58,6 +67,7 @@ internal static class Handler
         {
             var commands = new string[2];
             string line;
+            int index = 0;
             while ((line = reader.ReadLine()) != null)
             {
                 if (string.IsNullOrWhiteSpace(line) &&
@@ -72,10 +82,16 @@ internal static class Handler
                     {
                         try
                         {
-                            FileSystem.DeleteFile(
-                                filePath,
-                                UIOption.OnlyErrorDialogs,
-                                RecycleOption.SendToRecycleBin);
+                            if (hasDeletePermission)
+                            {
+                                FileSystem.DeleteFile(
+                                    filePath,
+                                    UIOption.OnlyErrorDialogs,
+                                    RecycleOption.SendToRecycleBin);
+                            }
+
+                            index++;
+                            Console.Write($"\r[{sw.Elapsed}] {index} file deleted.          ");
                         }
                         catch (FileNotFoundException)
                         {
@@ -99,7 +115,6 @@ internal static class Handler
 
                     continue;
                 }
-
                 commands = line.Split(" ", 2);
                 commands = commands.Last().Split(" | ");
 
@@ -109,8 +124,16 @@ internal static class Handler
             }
         }
 
+        Console.WriteLine();
         Console.ForegroundColor = ConsoleColor.DarkRed;
-        Console.WriteLine($"Selected files moved to recycle bin. (Size: {FormatSize(deletedSize)})");
+        if (hasDeletePermission)
+        {
+            Console.WriteLine($"Selected files moved to recycle bin. (Size: {FormatSize(deletedSize)})");
+        }
+        else
+        {
+            Console.WriteLine($"'{FormatSize(deletedSize)}' file is ready to delete.");
+        }
         Console.ResetColor();
     }
 
@@ -142,6 +165,20 @@ internal static class Handler
 
         helpText = @$"{Command.Apply,-10} {"<file-path>",-15} {$"[{Command.KN} | {Command.KeepNewest}]",-25} {"Apply changes that you selected on result file",-10}";
         Console.WriteLine(helpText);
+    }
+
+    static bool HasOnlyShowInfoFlagForApply()
+    {
+        for (var i = 0; i < _args.Length; i++)
+        {
+            if (_args[i].Equals(Command.OnlyShowInfo, StringComparison.OrdinalIgnoreCase) ||
+                _args[i].Equals(Command.OSI, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     static string GetSearchAddress(int indexOfSearchAddressArg)

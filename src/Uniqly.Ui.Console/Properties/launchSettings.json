@@ -6,6 +6,8 @@
 
       //"commandLineArgs": "apply \"D:\\WithDups\"",
       //"commandLineArgs": "apply \"D:\\WithDups\" --keep-newest",
+      //"commandLineArgs": "apply \"D:\\WithDups\" --keep-newest --only-show-info",
+      "commandLineArgs": "apply \"E:\\Phone\" -kn -osi"
 
       //"commandLineArgs": "--version",
       //"commandLineArgs": "-v"
